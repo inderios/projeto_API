@@ -2,20 +2,40 @@
 version: '3.8'
 
 services:
+  # Nosso serviço do banco de dados PostgreSQL
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/ # Volume para persistir os dados
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=mercadorias_db
+    ports:
+      - "5432:5432" # Opcional: Para acessar o DB de fora com um cliente
+
   # Nosso serviço FastAPI
   app:
     build:
-      context: ./app  # O Docker Compose vai construir a imagem a partir do Dockerfile na pasta ./app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2 # Usando 2 workers por container
+      context: ./app
+    # IMPORTANTE: A aplicação agora depende do banco de dados para iniciar
+    depends_on:
+      - db
+    environment:
+      # A URL de conexão que o main.py vai usar
+      - DATABASE_URL=postgresql://admin:admin@db:5432/mercadorias_db
     deploy:
-      replicas: 3 # << AQUI A MÁGICA ACONTECE! Estamos criando 3 instâncias da nossa API.
-  
+      replicas: 3
+
   # Nosso serviço Nginx (Load Balancer)
   nginx:
     build:
       context: ./nginx
     ports:
-      - "80:80"  # Mapeia a porta 80 do host para a porta 80 do container Nginx.
-                 # É assim que acessamos o serviço pelo navegador.
+      - "80:80"
     depends_on:
-      - app      # Garante que o serviço 'app' seja iniciado antes do 'nginx'.
+      - app
+
+# Volume para garantir que os dados do banco não se percam
+volumes:
+  postgres_data:
